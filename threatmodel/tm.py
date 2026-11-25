@@ -19,7 +19,7 @@ tm.assumptions = [
 ]
 
 internet = Boundary("TB1 Internet")
-app_zone = Boundary("TB2 Application container")
+app_zone = Boundary("TB2 App container")
 data_zone = Boundary("TB3 Data")
 cicd = Boundary("TB4 CI/CD (GitHub)")
 

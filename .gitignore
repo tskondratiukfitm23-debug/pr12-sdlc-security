@@ -6,3 +6,4 @@ data/
 reports/
 *.sarif
 .pytest_cache/
+.env

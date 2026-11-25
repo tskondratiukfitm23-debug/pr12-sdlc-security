@@ -1,0 +1,55 @@
+rules:
+  - id: sqli-fstring
+    languages: [python]
+    severity: ERROR
+    message: "SQL-запит зібрано через f-string/конкатенацію — використовуйте параметризовані запити (CWE-89, INP-1)"
+    metadata: {cwe: "CWE-89", requirement: "INP-1", risk: "R1"}
+    patterns:
+      - pattern-either:
+          - pattern: $SQL = f"...SELECT..."
+          - pattern: $SQL = "...SELECT..." + $X
+          - pattern: $SQL = "...SELECT..." % $X
+          - pattern: $SQL = "...SELECT...".format(...)
+
+  - id: flask-raw-html-from-request
+    languages: [python]
+    severity: ERROR
+    message: "Значення з request повертається як HTML без екранування — reflected XSS (CWE-79, INP-2)"
+    metadata: {cwe: "CWE-79", requirement: "INP-2", risk: "R2"}
+    patterns:
+      - pattern-inside: |
+          $V = request.args.get(...)
+          ...
+      - pattern: return f"...{$V}..."
+
+  - id: plaintext-password-compare
+    languages: [python]
+    severity: ERROR
+    message: "Пароль порівнюється у відкритому вигляді — зберігайте хеш (scrypt/PBKDF2) і використовуйте check_password_hash (CWE-256, STOR-1)"
+    metadata: {cwe: "CWE-256", requirement: "STOR-1", risk: "R3"}
+    pattern-either:
+      - pattern: $ROW["password"] == $P
+      - pattern: $P == $ROW["password"]
+
+  - id: hardcoded-secret-key-fallback
+    languages: [python]
+    severity: ERROR
+    message: "SECRET_KEY має жорстко задане значення за замовчуванням (CWE-798, CONF-1)"
+    metadata: {cwe: "CWE-798", requirement: "CONF-1", risk: "R6"}
+    pattern-either:
+      - pattern: $APP.secret_key = os.environ.get("SECRET_KEY", "...")
+      - pattern: $APP.secret_key = "..."
+
+  - id: flask-debug-true
+    languages: [python]
+    severity: ERROR
+    message: "Flask запускається з debug=True — Werkzeug debugger дає RCE (CWE-94, ERR-1)"
+    metadata: {cwe: "CWE-94", requirement: "ERR-1", risk: "R5"}
+    pattern: $APP.run(..., debug=True, ...)
+
+  - id: sql-shown-to-user
+    languages: [python]
+    severity: WARNING
+    message: "Текст SQL-запиту передається у шаблон — розкриття внутрішньої структури (CWE-200)"
+    metadata: {cwe: "CWE-200", risk: "R9"}
+    pattern: render_template(..., sql=$S, ...)

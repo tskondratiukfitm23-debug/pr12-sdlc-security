@@ -1,8 +1,13 @@
-
 name: SAST
 on:
   push:
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write   # upload SARIF to Code scanning
+  actions: read
 
 jobs:
   semgrep-bandit-audit:
@@ -12,26 +17,46 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install deps
+      - name: Install tools
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install bandit semgrep
-      - name: Semgrep
-        run: semgrep scan --config auto --sarif --output semgrep.sarif || true
+          pip install "bandit[sarif]" semgrep pip-audit
+      - name: Semgrep (auto + custom rules)
+        run: |
+          semgrep scan --config auto --config .semgrep/rules.yml --sarif --output semgrep.sarif src || true
+          semgrep scan --config auto --config .semgrep/rules.yml --json --output semgrep.json src || true
       - name: Bandit
-        run: bandit -r src -f sarif -o bandit.sarif || true
-      - name: pip-audit
-        run: pip-audit -f sarif -o pip-audit.sarif || true
-      - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        run: |
+          bandit -r src -f sarif -o bandit.sarif || true
+          bandit -r src -f json -o bandit.json || true
+      - name: pip-audit (SCA)
+        run: pip-audit -r requirements.txt -f json -o pip-audit.json || true
+      - name: Upload Semgrep SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: semgrep.sarif
+          category: semgrep
+      - name: Upload Bandit SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: bandit.sarif
+          category: bandit
       - name: Upload artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sast-reports
           path: |
             semgrep.sarif
+            semgrep.json
             bandit.sarif
-            pip-audit.sarif
+            bandit.json
+            pip-audit.json
+      - name: Summary
+        if: always()
+        run: python scripts/sast_summary.py >> "$GITHUB_STEP_SUMMARY"
+      - name: Security gate (fail on High/ERROR findings or vulnerable deps)
+        run: python scripts/sast_summary.py --gate

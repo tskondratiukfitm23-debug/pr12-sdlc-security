@@ -1,0 +1,7 @@
+# Відповідальні рецензенти (segregation of duties)
+*                    @tskondratiukfitm23-debug
+/src/                @tskondratiukfitm23-debug
+/.github/workflows/  @tskondratiukfitm23-debug
+/Dockerfile          @tskondratiukfitm23-debug
+/docker-compose.yml  @tskondratiukfitm23-debug
+/threatmodel/        @tskondratiukfitm23-debug

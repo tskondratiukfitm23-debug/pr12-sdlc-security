@@ -76,10 +76,65 @@
 - **Виявлення:** кастомне Semgrep-правило, GitHub secret scanning, огляд PR.
 - **Пом'якшення:** обов'язковий `SECRET_KEY` з оточення / GitHub Secrets.
 
-## 4. Інструментальний аналіз архітектури (OWASP pytm)
+## 4. Інструментальний аналіз архітектури (OWASP pytm 1.4.1)
 
-Модель описана кодом у `threatmodel/tm.py`; результати й висновки буде додано після запуску.
+Архітектура описана кодом у `threatmodel/tm.py` (threat modeling as code): 4 межі довіри
+(TB1 Internet, TB2 App container, TB3 Data, TB4 CI/CD), 7 елементів (Actor, Server, 2 Datastore,
+Process, Lambda) і 8 потоків даних із класифікацією даних (PUBLIC … TOP_SECRET) та атрибутами
+контролів (`sanitizesInput`, `encodesOutput`, `implementsCSRFToken`, `usesParameterizedInput` тощо).
 
-## 5. Виявлені ризики / знахідки
+```
+python threatmodel/tm.py --dfd | dot -Tpng -o docs/dfd.png     # DFD (docs/dfd.png)
+python threatmodel/tm.py --json reports/pytm/tm.json          # знахідки
+```
 
-Заповнюється за результатами pytm, SAST та DAST.
+![DFD](dfd.png)
+
+### 4.1 Результати
+
+Модель описує стан **після** виправлень (PR #11, #12). pytm зіставив елементи з каталогом
+загроз (на основі CAPEC) і згенерував **125 потенційних загроз**: Very High — 13, High — 51,
+Medium — 57, Low — 4. Розподіл за ціллю: GitHub Actions — 31, Flask app — 22, потоки даних — 8×7…8,
+Audit logger — 8, сховища — по 4.
+
+### 4.2 Тріаж знахідок pytm
+
+| Група (ID pytm) | Ціль | Рішення | Обґрунтування / контроль |
+|---|---|---|---|
+| DS06 Data Leak (7, Very High) | усі потоки HTTP / env / log | **Прийнято, частково пом'якшено** | у застосунку немає TLS — він термінується на reverse-proxy (припущення моделі); рекомендація REC-1: HSTS + TLS 1.2+ |
+| AC17/AC19/AC20 Session hijacking / replay | Flask app | **Пом'якшено** | HttpOnly + SameSite=Lax, `session.clear()` при вході, життя сесії 30 хв; `Secure` — у production |
+| CR03 Dictionary-based Password Attack | Flask app | **Пом'якшено** | lockout 5 спроб / 15 хв, scrypt (N=32768) |
+| INP26/INP31/INP33 Code / Command injection, RCE | Flask app | **Пом'якшено** | debug вимкнено, немає `eval`/`subprocess`; Bandit = 0 |
+| INP28 XSS, INP20 iFrame overlay | Flask app | **Пом'якшено** | autoescape + `escape()`, CSP `frame-ancestors 'none'`, X-Frame-Options DENY |
+| AC21 CSRF | CI / app | **Пом'якшено** | CSRF-токен + `hmac.compare_digest` |
+| DR01 Unprotected Sensitive Data (7) | потоки з даними SECRET/TOP_SECRET | **Залишковий ризик (Medium)** | SQLite не шифрується at rest → REC-4 (шифрування тому / SQLCipher) |
+| DE04 Audit Log Manipulation | Audit logger | **Залишковий ризик (Medium)** | лог у stdout контейнера → REC-5 (централізований append-only лог) |
+| AC23 Credentials Disclosure, CR06 Channel manipulation | env, CI | **Пом'якшено / прийнято** | секрети не в коді й образі (коміт 9a77d9f), GitHub Secrets; TLS у GitHub |
+| INP02/INP07/INP12/INP24 Buffer overflow, INP22/INP32 XML | CI, app | **Не застосовно** | Python (керована пам'ять), XML не обробляється |
+| AC14, AC15, SC05 та ін. (generic для Process) | GitHub Actions | **Прийнято** | процес CI ізольований раннером GitHub, права workflow мінімальні (`contents: read`, `security-events: write`) |
+
+Висновок: жодна Very High/High загроза pytm не залишилась без контролю чи обґрунтованого рішення;
+залишкові ризики (DS06, DR01, DE04) винесені в рекомендації аудиту.
+
+## 5. Виявлені ризики / знахідки (зведення)
+
+| Джерело | Baseline | Після PR #11 | Після PR #12 + 9a77d9f |
+|---|---|---|---|
+| Semgrep + Bandit + pip-audit (гейт) | 21 знахідка, **10 blocking** | 3 blocking | **0 blocking**, 1 false positive (dismissed) |
+| GitHub Code scanning | 19 open | — | 19 fixed, 1 dismissed, 0 open |
+| ZAP baseline | WARN 13 (4 Medium, 6 Low) | — | WARN 7 (0 Medium, 1 Low, 6 Info) |
+| pytm | — | — | 125 потенційних, 3 групи залишкових ризиків |
+
+| Ризик | Статус | Як закрито |
+|---|---|---|
+| R1 SQLi | Closed (#2, PR #11) | параметризований запит |
+| R2 XSS | Closed (#3, PR #11) | `escape()` + CSP |
+| R3 Слабка автентифікація | Closed (#5, PR #12) | scrypt + lockout |
+| R4 flask 3.0.3 | Closed (#7, PR #12) | flask 3.1.3 |
+| R5 debug=True | Closed (#4, PR #11) | debug із env, off |
+| R6 SECRET_KEY | Closed (#6, PR #12, 9a77d9f) | обов'язковий env, прибрано з Dockerfile/compose |
+| R7 cookie/headers/CSRF | Closed (#8, #9, PR #12) | прапорці, заголовки, токен |
+| R8 аудит | Closed (PR #12) | `audit` logger |
+| R9 показ SQL | Closed (#10, PR #11) | прибрано з шаблону |
+| R10 bind 0.0.0.0 | Closed (PR #11) | host із env, 127.0.0.1 |
+| RR1 Server: Werkzeug | **Open (Low)** | dev-сервер; у production — gunicorn + nginx `server_tokens off` |

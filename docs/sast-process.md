@@ -48,7 +48,7 @@
 
 | Етап | Знахідок | Blocking | Code scanning |
 |---|---|---|---|
-| Baseline (b813dca) | 21 | 10 | 19 open |
+| Baseline (b813dca) | 20 | 9 | 19 open |
 | PR #11 (SQLi, XSS, debug, SQL disclosure) | 4 | 3 | — |
 | PR #12 (auth, secrets, CSRF, headers, flask 3.1.3) | 1 | **0** | 19 fixed, #20 dismissed (FP) |
 

@@ -107,8 +107,8 @@ Audit logger — 8, сховища — по 4.
 | INP26/INP31/INP33 Code / Command injection, RCE | Flask app | **Пом'якшено** | debug вимкнено, немає `eval`/`subprocess`; Bandit = 0 |
 | INP28 XSS, INP20 iFrame overlay | Flask app | **Пом'якшено** | autoescape + `escape()`, CSP `frame-ancestors 'none'`, X-Frame-Options DENY |
 | AC21 CSRF | CI / app | **Пом'якшено** | CSRF-токен + `hmac.compare_digest` |
-| DR01 Unprotected Sensitive Data (7) | потоки з даними SECRET/TOP_SECRET | **Залишковий ризик (Medium)** | SQLite не шифрується at rest → REC-4 (шифрування тому / SQLCipher) |
-| DE04 Audit Log Manipulation | Audit logger | **Залишковий ризик (Medium)** | лог у stdout контейнера → REC-5 (централізований append-only лог) |
+| DR01 Unprotected Sensitive Data (7) | потоки з даними SECRET/TOP_SECRET | **Залишковий ризик (Medium)** | SQLite не шифрується at rest → REC-10 (шифрування тому / SQLCipher) |
+| DE04 Audit Log Manipulation | Audit logger | **Залишковий ризик (Medium)** | лог у stdout контейнера → REC-8 (централізований append-only лог, SIEM) |
 | AC23 Credentials Disclosure, CR06 Channel manipulation | env, CI | **Пом'якшено / прийнято** | секрети не в коді й образі (коміт 9a77d9f), GitHub Secrets; TLS у GitHub |
 | INP02/INP07/INP12/INP24 Buffer overflow, INP22/INP32 XML | CI, app | **Не застосовно** | Python (керована пам'ять), XML не обробляється |
 | AC14, AC15, SC05 та ін. (generic для Process) | GitHub Actions | **Прийнято** | процес CI ізольований раннером GitHub, права workflow мінімальні (`contents: read`, `security-events: write`) |
@@ -120,7 +120,7 @@ Audit logger — 8, сховища — по 4.
 
 | Джерело | Baseline | Після PR #11 | Після PR #12 + 9a77d9f |
 |---|---|---|---|
-| Semgrep + Bandit + pip-audit (гейт) | 21 знахідка, **10 blocking** | 3 blocking | **0 blocking**, 1 false positive (dismissed) |
+| Semgrep + Bandit + pip-audit (гейт) | 20 знахідок, **9 blocking** | 3 blocking | **0 blocking**, 1 false positive (dismissed) |
 | GitHub Code scanning | 19 open | — | 19 fixed, 1 dismissed, 0 open |
 | ZAP baseline | WARN 13 (4 Medium, 6 Low) | — | WARN 7 (0 Medium, 1 Low, 6 Info) |
 | pytm | — | — | 125 потенційних, 3 групи залишкових ризиків |

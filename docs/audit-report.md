@@ -14,7 +14,7 @@
 | STOR-1 | Стійкий сольований хеш паролів | ✅ Виконано | scrypt (`werkzeug.security`), PR #12 |
 | INP-1 | Параметризовані SQL-запити | ✅ Виконано | Bandit B608 = 0, Semgrep tainted-sql = 0 (PR #11) |
 | INP-2 | Екранування виводу | ✅ Виконано | `escape()` + Jinja2 autoescape, ZAP XSS = 0 |
-| INP-3 | Обмеження довжини параметрів ≤ 200 | ⚠️ Частково | обрізання до 200 символів замість відповіді 400 |
+| INP-3 | Обмеження довжини параметрів ≤ 200 | ⚠️ Частково | параметри обрізаються до 100 символів (у межах ліміту), але відповідь 400 не повертається |
 | CSRF-1 | CSRF-токен у формах | ✅ Виконано | POST без токена → 400 (PR #12) |
 | SESS-1 | Прапорці cookie | ✅ Виконано | HttpOnly, SameSite=Lax; Secure — через змінну оточення |
 | HDR-1 | Заголовки безпеки | ✅ Виконано | CSP, XFO, XCTO, Referrer-Policy; ZAP Medium 4 → 0 |
@@ -40,17 +40,18 @@
 
 ## 3. Закриті вразливості
 
-| Ризик | Вразливість | Severity | Issue | Закрито в | Перевірка |
-|-------|-------------|----------|-------|-----------|-----------|
-| R1 | SQL injection у `/search` (CWE-89) | Critical | #2 | PR #11 | Bandit/Semgrep = 0 |
-| R2 | Reflected XSS у `/echo` (CWE-79) | High | #3 | PR #11 | ZAP, Semgrep = 0 |
-| R3 | Debug-режим Flask (CWE-489) | High | #4 | PR #11 | Bandit B201 = 0 |
-| R4 | Слабке хешування паролів, brute force (CWE-916/307) | High | #5 | PR #12 | ручний тест 429 |
-| R5 | Захардкоджений SECRET_KEY (CWE-798) | High | #6 | PR #12, 9a77d9f | RuntimeError без ключа |
-| R6 | Вразлива версія Flask (CVE) | High | #7 | PR #12 | pip-audit = 0 |
-| R7 | Відсутній CSRF (CWE-352) | Medium | #8 | PR #12 | POST без токена → 400 |
-| R8 | Відсутні заголовки безпеки (CWE-693) | Medium | #9 | PR #12 | ZAP Medium = 0 |
-| R9 | Розкриття SQL у помилках (CWE-209) | Medium | #10 | PR #11 | ручна перевірка |
+| Ризик | Вразливість | Severity (CVSS) | Issue | Закрито в | Перевірка |
+|-------|-------------|-----------------|-------|-----------|-----------|
+| R1 | SQL injection у `/search` (CWE-89) | Critical (9.8) | #2 | PR #11 | Bandit B608 / Semgrep = 0 |
+| R2 | Reflected XSS у `/echo` (CWE-79) | High (6.1) | #3 | PR #11 | Semgrep = 0, ZAP |
+| R3 | Паролі у відкритому вигляді, немає lockout (CWE-256/307) | Critical (8.1) | #5 | PR #12 | scrypt у БД, 6-та спроба → 429 |
+| R4 | Вразлива залежність flask 3.0.3 | High (7.5) | #7 | PR #12 | pip-audit = 0 |
+| R5 | Werkzeug debugger, `debug=True` (CWE-94/489) | Critical (9.8) | #4 | PR #11 | Bandit B201 = 0 |
+| R6 | Захардкоджений `SECRET_KEY` (CWE-798) | High (7.4) | #6 | PR #12, 9a77d9f | RuntimeError без ключа |
+| R7 | Немає CSRF, прапорців cookie, заголовків (CWE-352/693) | Medium (5.4) | #8, #9 | PR #12 | ZAP Medium = 0 |
+| R8 | Немає аудиту входів (CWE-778) | Medium (4.3) | — | PR #12 | події `login_success/failed/locked`, `csrf_rejected` |
+| R9 | Показ тексту SQL на сторінці (CWE-209) | Medium (5.3) | #10 | PR #11 | ZAP 10099 = PASS |
+| R10 | Bind на 0.0.0.0 у dev (CWE-1327) | Low (3.1) | — | PR #11 | host з env, 127.0.0.1 |
 
 Підсумок: Code scanning — 19 fixed, 1 dismissed (false positive `django-no-csrf-token`), 0 open. ZAP: FAIL 0, WARN 13 → 7, PASS 58 → 64.
 Залишковий ризик **RR1** (Low): заголовок `Server: Werkzeug/x.y` розкриває версію — прийнято до переходу на gunicorn (REC-2), Issue #1 відкрите.
@@ -85,7 +86,8 @@
 | REC-7 | Маршрут `/logout`, 400 для задовгих параметрів | Low | Dev | наступний спринт |
 | REC-8 | Структуровані JSON-логи, централізація (SIEM) | Low | DevOps | наступний спринт |
 | REC-9 | Обов'язковий review ≥ 1 CODEOWNER, підписані коміти | Low | Owner | наступний спринт |
+| REC-10 | Шифрування БД at rest (зашифрований том / SQLCipher) — залишковий ризик pytm DR01 | Medium | DevOps | 14 днів |
 
 ## 6. Висновок аудиту
 
-Усі 9 вразливостей початкового реєстру (1 Critical, 5 High, 3 Medium) закриті та підтверджені повторними SAST/DAST-скануваннями. Гейт безпеки блокує злиття при High/Critical. Залишається один прийнятий Low-ризик (RR1) і 4 частково виконані вимоги, для яких є план REC-1…REC-9 зі строками згідно з SLA (NFR-4).
+Усі 10 ризиків початкового реєстру (3 Critical, 3 High, 3 Medium, 1 Low) закриті та підтверджені повторними SAST/DAST-скануваннями. Гейт безпеки блокує злиття при High/Critical. Залишається один прийнятий Low-ризик (RR1) і 4 частково виконані вимоги, для яких є план REC-1…REC-10 зі строками згідно з SLA (NFR-4).

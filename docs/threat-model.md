@@ -120,7 +120,7 @@ Audit logger — 8, сховища — по 4.
 
 | Джерело | Baseline | Після PR #11 | Після PR #12 + 9a77d9f |
 |---|---|---|---|
-| Semgrep + Bandit + pip-audit (гейт) | 21 знахідка, **10 blocking** | 3 blocking | **0 blocking**, 1 false positive (dismissed) |
+| Semgrep + Bandit + pip-audit (гейт) | 20 знахідок, **9 blocking** | 3 blocking | **0 blocking**, 1 false positive (dismissed) |
 | GitHub Code scanning | 19 open | — | 19 fixed, 1 dismissed, 0 open |
 | ZAP baseline | WARN 13 (4 Medium, 6 Low) | — | WARN 7 (0 Medium, 1 Low, 6 Info) |
 | pytm | — | — | 125 потенційних, 3 групи залишкових ризиків |

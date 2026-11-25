@@ -1,5 +1,11 @@
-Risk ID,Threat,Likelihood,Impact,Severity,Owner,Status,Notes
-R1,SQLi,High,High,Critical,Team,Open,
-R2,XSS,Med,Med,High,Team,Open,
-R3,Weak auth,High,High,Critical,Team,Open,
-R4,Deps vulns,Med,Med,High,Team,Open,
+Risk ID,Threat,STRIDE,Asset,Likelihood (1-5),Impact (1-5),Score (LxI),Severity,CVSS 3.1,CWE,Owner,Detection,Mitigation,Status,Issue,SLA
+R1,SQL injection in /search (q in f-string),T/I,A1;A4,5,5,25,Critical,9.8,CWE-89,Dev,Bandit B608; Semgrep tainted-sql; ZAP active SQLi,Parameterized queries,Open,,24h
+R2,Reflected XSS in /echo (msg as raw HTML),I/S,A2,5,3,15,High,6.1,CWE-79,Dev,Semgrep raw-html-format; ZAP,markupsafe.escape + CSP,Open,,3d
+R3,Weak authentication: plaintext passwords; no lockout,S/I,A1,4,5,20,Critical,8.1,CWE-256;CWE-307,Dev,Code review; Semgrep custom rule,scrypt hash + lockout 5/15min,Open,,24h
+R4,Vulnerable dependency flask==3.0.3,T,A6,3,3,9,High,7.5,CWE-1104,DevOps,pip-audit,Upgrade flask>=3.1.3; pin deps,Open,,3d
+R5,Werkzeug debugger enabled (debug=True),E,A6,3,5,15,Critical,9.8,CWE-94;CWE-489,Dev,Bandit B201; Semgrep debug-enabled,debug from env (default off),Open,,24h
+R6,Hardcoded SECRET_KEY fallback,S/I,A2;A3,3,4,12,High,7.4,CWE-798,DevOps,Semgrep custom rule; secret scanning,Mandatory env var; GitHub Secrets,Open,,3d
+R7,Cookie flags; security headers; CSRF missing,S/T,A2,3,3,9,Medium,5.4,CWE-1004;CWE-352;CWE-693,Dev,ZAP baseline; Semgrep csrf,Cookie flags; CSP/XFO/XCTO; CSRF token,Open,,14d
+R8,No audit logging of logins,R,A5,3,2,6,Medium,4.3,CWE-778,Dev,Code review; LOG-1 test,JSON audit log,Open,,14d
+R9,SQL text disclosed on /search page,I,A4,4,2,8,Medium,5.3,CWE-200,Dev,Code review; ZAP,Remove SQL from template,Open,,14d
+R10,Bind to 0.0.0.0 in dev entrypoint,I,A6,2,2,4,Low,3.1,CWE-605,DevOps,Bandit B104,HOST from env (default 127.0.0.1),Open,,next release

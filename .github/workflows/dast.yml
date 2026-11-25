@@ -14,6 +14,7 @@ jobs:
           python-version: '3.11'
       - name: Run app
         run: |
+          pip install -r requirements.txt
           python src/db.py
           nohup python -m flask --app src/app.py run --host=0.0.0.0 --port=5000 &
           sleep 5
